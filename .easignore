@@ -38,7 +38,3 @@ yarn-error.*
 
 app-example
 
-# Android
-expo-notifications-be105-firebase-adminsdk-fbsvc-10551202d8.json
-google-services.json
-/android
