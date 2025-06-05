@@ -26,6 +26,8 @@ export default function ProfileScreen() {
     { key: string; label: string }[]
   >([]);
 
+  const [expoToken, setExpoToken] = useState<string | null>(null);
+
   const isDark = theme === "dark";
   const themedStyles = getStyles(isDark);
 
@@ -39,33 +41,81 @@ export default function ProfileScreen() {
     loadTheme();
   }, []);
 
+  // Fetch notification types once on mount
   useEffect(() => {
-    const fetchPreferences = async () => {
+    const fetchNotificationTypes = async () => {
       try {
-        const token = await SecureStore.getItemAsync("auth_token");
-        if (!token) throw new Error("Missing auth token");
-
-        const response = await fetch(`${API_BASE_URL}/api/preferences`, {
+        const response = await fetch(`${API_BASE_URL}/api/notification-types`, {
           headers: {
-            Authorization: `Bearer ${token}`,
             Accept: "application/json",
           },
         });
 
-        const responseText = await response.text();
-        if (!response.ok) throw new Error("Failed to load preferences");
+        if (!response.ok) throw new Error("Failed to load notification types");
 
-        const data = JSON.parse(responseText);
-        setPreferences(data);
+        const typesData = await response.json();
 
-        const types = Object.keys(data).map((key) => ({
-          key,
-          label: key
+        const types = typesData.map((type: { name: string; description?: string }) => ({
+          key: type.name,
+          label: type.name
             .replace(/_/g, " ")
             .replace(/\b\w/g, (c) => c.toUpperCase()),
         }));
 
         setNotificationTypes(types);
+      } catch (error: any) {
+        console.error("❌ Failed to load notification types:", error);
+        Alert.alert(
+          "Error",
+          `Could not load notification types:\n${error.message}`
+        );
+      }
+    };
+
+    fetchNotificationTypes();
+  }, []);
+
+  // Get Expo Push Token on mount and store it securely
+  useEffect(() => {
+    const getAndStoreExpoToken = async () => {
+      try {
+        let storedToken = await SecureStore.getItemAsync("expo_token");
+        if (!storedToken) {
+          const tokenResponse = await Notifications.getExpoPushTokenAsync();
+          storedToken = tokenResponse.data;
+          await SecureStore.setItemAsync("expo_token", storedToken);
+        }
+        setExpoToken(storedToken);
+      } catch (e) {
+        console.error("Failed to get Expo push token:", e);
+      }
+    };
+    getAndStoreExpoToken();
+  }, []);
+
+  // Fetch preferences when user or expoToken changes
+  useEffect(() => {
+    const fetchPreferences = async () => {
+      try {
+        if (!user) return;
+        if (!expoToken) return;
+
+        const token = await SecureStore.getItemAsync("auth_token");
+        if (!token) return;
+
+        const response = await fetch(`${API_BASE_URL}/api/notification-preferences`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            "Expo-Token": expoToken,
+          },
+        });
+
+        if (!response.ok) throw new Error("Failed to load preferences");
+
+        const data = await response.json();
+
+        setPreferences(data);
       } catch (error: any) {
         console.error("❌ Failed to load preferences:", error);
         Alert.alert(
@@ -76,7 +126,7 @@ export default function ProfileScreen() {
     };
 
     fetchPreferences();
-  }, []);
+  }, [user, expoToken]);
 
   const togglePreference = async (key: string) => {
     const newValue = !preferences[key];
@@ -85,13 +135,15 @@ export default function ProfileScreen() {
     try {
       const token = await SecureStore.getItemAsync("auth_token");
       if (!token) throw new Error("Missing auth token");
+      if (!expoToken) throw new Error("Missing expo token");
 
-      const response = await fetch(`${API_BASE_URL}/api/preferences`, {
+      const response = await fetch(`${API_BASE_URL}/api/notification-preferences`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           Accept: "application/json",
+          "Expo-Token": expoToken,
         },
         body: JSON.stringify({ [key]: newValue }),
       });
@@ -102,7 +154,7 @@ export default function ProfileScreen() {
       try {
         data = JSON.parse(raw);
       } catch {
-        // invalid JSON; ignore
+        // ignore invalid JSON
       }
 
       if (!response.ok) {
@@ -134,7 +186,7 @@ export default function ProfileScreen() {
             if (!token) throw new Error("No auth token available.");
 
             const tokenResponse = await Notifications.getExpoPushTokenAsync();
-            const expoToken = tokenResponse.data;
+            const currentExpoToken = tokenResponse.data || expoToken;
 
             const response = await fetch(`${API_BASE_URL}/api/logout`, {
               method: "POST",
@@ -143,7 +195,7 @@ export default function ProfileScreen() {
                 "Content-Type": "application/json",
                 Accept: "application/json",
               },
-              body: JSON.stringify({ expo_token: expoToken }),
+              body: JSON.stringify({ expo_token: currentExpoToken }),
             });
 
             const data = await response.json();

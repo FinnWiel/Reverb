@@ -15,6 +15,7 @@ import { NotificationProvider } from "@/context/NotificationContext";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { registerForPushNotificationsAsync } from "@/utils/registerForPushNotificationsAsync";
 
+
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isAuthLoaded } = useLogin();
   const router = useRouter();
@@ -61,18 +62,20 @@ export default function RootLayout() {
 
   return (
     <NotificationProvider>
-      <LoginProvider>
-        <AuthGate>
-          <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="login" />
-              <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="auto" />
-          </ThemeProvider>
-        </AuthGate>
-      </LoginProvider>
+        <LoginProvider>
+            <AuthGate>
+              <ThemeProvider
+                value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+              >
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="login" />
+                  <Stack.Screen name="+not-found" />
+                </Stack>
+                <StatusBar style="auto" />
+              </ThemeProvider>
+            </AuthGate>
+        </LoginProvider>
     </NotificationProvider>
   );
 }

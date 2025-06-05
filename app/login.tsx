@@ -54,6 +54,7 @@ export default function LoginScreen() {
       }
 
       const expoToken = (await Notifications.getExpoPushTokenAsync()).data;
+      console.log("📲 Expo push token:", expoToken);
 
       const response = await fetch(`${API_BASE_URL}/api/login`, {
         method: "POST",
@@ -61,7 +62,7 @@ export default function LoginScreen() {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ email, password, expo_token: expoToken }),
+        body: JSON.stringify({ email, password, expo_token: expoToken, device_type: Platform.OS }),
       });
 
       const data = await response.json();

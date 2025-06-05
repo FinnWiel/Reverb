@@ -1,5 +1,7 @@
+import { API_BASE_URL } from "@/constants/Constants";
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { Alert } from "react-native";
 
 type User = {
   id: number;
@@ -25,48 +27,51 @@ export const LoginProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAuthLoaded, setIsAuthLoaded] = useState(false);
 
   const login = async (newToken: string, userData: User) => {
-    console.log("🔐 Saving auth token and user...");
     await SecureStore.setItemAsync("auth_token", newToken);
     await SecureStore.setItemAsync("user", JSON.stringify(userData));
-
     setToken(newToken);
     setUser(userData);
     setIsLoggedIn(true);
-
-    console.log("✅ Login context updated:", {
-      token: newToken,
-      user: userData,
-    });
   };
 
   const logout = async () => {
-    console.log("🚪 Logging out and clearing storage...");
     await SecureStore.deleteItemAsync("auth_token");
     await SecureStore.deleteItemAsync("user");
-    await SecureStore.deleteItemAsync("expo_token"); // Optional
+    await SecureStore.deleteItemAsync("expo_token");
     setToken(null);
     setUser(null);
     setIsLoggedIn(false);
   };
 
   const checkLogin = async () => {
-    console.log("🔄 Checking for stored login...");
     const storedToken = await SecureStore.getItemAsync("auth_token");
-    const storedUser = await SecureStore.getItemAsync("user");
 
-    if (storedToken && storedUser) {
+    if (storedToken) {
       try {
-        const parsedUser = JSON.parse(storedUser);
+        const res = await fetch(`${API_BASE_URL}/api/me`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+            Accept: "application/json",
+          },
+        });
+
+        const raw = await res.text();
+        const parsed = JSON.parse(raw);
+
+        if (!parsed.user) {
+          throw new Error("Missing user field");
+        }
+
+        const userData: User = parsed.user;
         setToken(storedToken);
-        setUser(parsedUser);
+        setUser(userData);
         setIsLoggedIn(true);
-        console.log("✅ Rehydrated user:", parsedUser);
-      } catch (err) {
-        console.warn("⚠️ Failed to parse user. Logging out...");
+      } catch (err: any) {
+        console.warn("❌ Failed to parse user from /api/me response:", err.message);
         await logout();
+        Alert.alert("Session expired", "Please log in again.");
       }
-    } else {
-      console.log("❌ No valid login found.");
     }
 
     setIsAuthLoaded(true);
