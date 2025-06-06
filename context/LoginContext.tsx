@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/constants/Constants";
+import { useApiConfig } from "@/context/ApiConfigContext";
 import * as SecureStore from "expo-secure-store";
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Alert } from "react-native";
@@ -21,6 +21,12 @@ type LoginContextType = {
 const LoginContext = createContext<LoginContextType | undefined>(undefined);
 
 export const LoginProvider = ({ children }: { children: React.ReactNode }) => {
+  return <LoginProviderInner>{children}</LoginProviderInner>;
+};
+
+const LoginProviderInner = ({ children }: { children: React.ReactNode }) => {
+  const { apiUrl, setApiUrl } = useApiConfig();
+
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -38,6 +44,8 @@ export const LoginProvider = ({ children }: { children: React.ReactNode }) => {
     await SecureStore.deleteItemAsync("auth_token");
     await SecureStore.deleteItemAsync("user");
     await SecureStore.deleteItemAsync("expo_token");
+    await SecureStore.deleteItemAsync("api-url");
+    setApiUrl(null); // ✅ Clear the apiUrl from context
     setToken(null);
     setUser(null);
     setIsLoggedIn(false);
@@ -46,9 +54,9 @@ export const LoginProvider = ({ children }: { children: React.ReactNode }) => {
   const checkLogin = async () => {
     const storedToken = await SecureStore.getItemAsync("auth_token");
 
-    if (storedToken) {
+    if (storedToken && apiUrl) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/me`, {
+        const res = await fetch(`${apiUrl}/api/me`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${storedToken}`,
@@ -79,7 +87,7 @@ export const LoginProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     checkLogin();
-  }, []);
+  }, [apiUrl]); 
 
   return (
     <LoginContext.Provider

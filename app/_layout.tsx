@@ -10,11 +10,51 @@ import React, { useEffect } from "react";
 import { ActivityIndicator, View } from "react-native";
 import "react-native-reanimated";
 
+import { ApiConfigProvider, useApiConfig } from "@/context/ApiConfigContext";
 import { LoginProvider, useLogin } from "@/context/LoginContext";
 import { NotificationProvider } from "@/context/NotificationContext";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { registerForPushNotificationsAsync } from "@/utils/registerForPushNotificationsAsync";
 
+function ApiConfigGate({ children }: { children: React.ReactNode }) {
+  const { apiUrl, isConfigLoaded } = useApiConfig();
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const lastRedirectedUrlRef = React.useRef<string | null>(null);
+
+  useEffect(() => {
+    // Reset if config is reloaded and apiUrl is cleared
+    if (!apiUrl) {
+      lastRedirectedUrlRef.current = null;
+    }
+  }, [apiUrl]);
+
+  useEffect(() => {
+    if (!isConfigLoaded) return;
+
+    const isOnConfigPage = pathname === "/api-config";
+    const isUrlMissing = !apiUrl;
+
+    const alreadyRedirected = lastRedirectedUrlRef.current === pathname;
+
+    if (isUrlMissing && !isOnConfigPage && !alreadyRedirected) {
+      console.log("🔁 Redirecting to /api-config...");
+      lastRedirectedUrlRef.current = pathname;
+      router.replace("/api-config");
+    }
+  }, [apiUrl, isConfigLoaded, pathname]);
+
+  if (!isConfigLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isLoggedIn, isAuthLoaded } = useLogin();
@@ -25,8 +65,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!isAuthLoaded) return;
 
     const isLoginScreen = pathname === "/login";
+    const isConfigPage = pathname === "/api-config";
 
-    if (!isLoggedIn && !isLoginScreen) {
+    if (!isLoggedIn && !isLoginScreen && !isConfigPage) {
       router.replace("/login");
     }
 
@@ -56,13 +97,13 @@ export default function RootLayout() {
     registerForPushNotificationsAsync();
   }, []);
 
-  if (!loaded) {
-    return null;
-  }
+  if (!loaded) return null;
 
   return (
-    <NotificationProvider>
-        <LoginProvider>
+    <ApiConfigProvider>
+      <ApiConfigGate>
+        <NotificationProvider>
+          <LoginProvider>
             <AuthGate>
               <ThemeProvider
                 value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
@@ -70,12 +111,15 @@ export default function RootLayout() {
                 <Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="index" />
                   <Stack.Screen name="login" />
+                  <Stack.Screen name="api-config" />
                   <Stack.Screen name="+not-found" />
                 </Stack>
                 <StatusBar style="auto" />
               </ThemeProvider>
             </AuthGate>
-        </LoginProvider>
-    </NotificationProvider>
+          </LoginProvider>
+        </NotificationProvider>
+      </ApiConfigGate>
+    </ApiConfigProvider>
   );
 }

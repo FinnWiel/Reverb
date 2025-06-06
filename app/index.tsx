@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/constants/Constants";
+import { useApiConfig } from "@/context/ApiConfigContext";
 import { useLogin } from "@/context/LoginContext";
 import { Feather } from "@expo/vector-icons";
 import * as Notifications from "expo-notifications";
@@ -17,9 +17,12 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
+
+  
   const { user, logout } = useLogin();
   const systemScheme = useColorScheme();
   const [theme, setTheme] = useState<"light" | "dark">(systemScheme || "light");
+  const { apiUrl } = useApiConfig();
 
   const [preferences, setPreferences] = useState<Record<string, boolean>>({});
   const [notificationTypes, setNotificationTypes] = useState<
@@ -45,7 +48,7 @@ export default function ProfileScreen() {
   useEffect(() => {
     const fetchNotificationTypes = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/notification-types`, {
+        const response = await fetch(`${apiUrl}/api/notification-types`, {
           headers: {
             Accept: "application/json",
           },
@@ -55,12 +58,14 @@ export default function ProfileScreen() {
 
         const typesData = await response.json();
 
-        const types = typesData.map((type: { name: string; description?: string }) => ({
-          key: type.name,
-          label: type.name
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (c) => c.toUpperCase()),
-        }));
+        const types = typesData.map(
+          (type: { name: string; description?: string }) => ({
+            key: type.name,
+            label: type.name
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (c) => c.toUpperCase()),
+          })
+        );
 
         setNotificationTypes(types);
       } catch (error: any) {
@@ -103,13 +108,16 @@ export default function ProfileScreen() {
         const token = await SecureStore.getItemAsync("auth_token");
         if (!token) return;
 
-        const response = await fetch(`${API_BASE_URL}/api/notification-preferences`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-            "Expo-Token": expoToken,
-          },
-        });
+        const response = await fetch(
+          `${apiUrl}/api/notification-preferences`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+              "Expo-Token": expoToken,
+            },
+          }
+        );
 
         if (!response.ok) throw new Error("Failed to load preferences");
 
@@ -137,16 +145,19 @@ export default function ProfileScreen() {
       if (!token) throw new Error("Missing auth token");
       if (!expoToken) throw new Error("Missing expo token");
 
-      const response = await fetch(`${API_BASE_URL}/api/notification-preferences`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "Expo-Token": expoToken,
-        },
-        body: JSON.stringify({ [key]: newValue }),
-      });
+      const response = await fetch(
+        `${apiUrl}/api/notification-preferences`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "Expo-Token": expoToken,
+          },
+          body: JSON.stringify({ [key]: newValue }),
+        }
+      );
 
       const raw = await response.text();
 
@@ -188,7 +199,7 @@ export default function ProfileScreen() {
             const tokenResponse = await Notifications.getExpoPushTokenAsync();
             const currentExpoToken = tokenResponse.data || expoToken;
 
-            const response = await fetch(`${API_BASE_URL}/api/logout`, {
+            const response = await fetch(`${apiUrl}/api/logout`, {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${token}`,
