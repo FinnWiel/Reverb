@@ -46,39 +46,56 @@ export default function ProfileScreen() {
 
   // Fetch notification types once on mount
   useEffect(() => {
-    const fetchNotificationTypes = async () => {
+  const fetchNotificationTypes = async () => {
+    console.log("🔄 Fetching notification types from:", `${apiUrl}/api/notification-types`);
+    try {
+      const response = await fetch(`${apiUrl}/api/notification-types`, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      console.log("📡 Response status:", response.status);
+      console.log("📡 Response headers:", response.headers);
+
+      const rawData = await response.text();
+      console.log("📦 Raw response body:", rawData);
+
+      if (!response.ok) throw new Error("Failed to load notification types");
+
+      let typesData;
       try {
-        const response = await fetch(`${apiUrl}/api/notification-types`, {
-          headers: {
-            Accept: "application/json",
-          },
-        });
-
-        if (!response.ok) throw new Error("Failed to load notification types");
-
-        const typesData = await response.json();
-
-        const types = typesData.map(
-          (type: { name: string; description?: string }) => ({
-            key: type.name,
-            label: type.name
-              .replace(/_/g, " ")
-              .replace(/\b\w/g, (c) => c.toUpperCase()),
-          })
-        );
-
-        setNotificationTypes(types);
-      } catch (error: any) {
-        console.error("❌ Failed to load notification types:", error);
-        Alert.alert(
-          "Error",
-          `Could not load notification types:\n${error.message}`
-        );
+        typesData = JSON.parse(rawData);
+      } catch (jsonError) {
+        console.error("❌ Failed to parse JSON:", jsonError);
+        throw new Error("Invalid JSON response");
       }
-    };
 
-    fetchNotificationTypes();
-  }, []);
+      console.log("✅ Parsed typesData:", typesData);
+
+      const types = typesData.map(
+        (type: { name: string; description?: string }) => ({
+          key: type.name,
+          label: type.name
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (c) => c.toUpperCase()),
+        })
+      );
+
+      console.log("✅ Processed notification types:", types);
+      setNotificationTypes(types);
+    } catch (error: any) {
+      console.error("❌ Failed to load notification types:", error);
+      Alert.alert(
+        "Error",
+        `Could not load notification types:\n${error.message}`
+      );
+    }
+  };
+
+  fetchNotificationTypes();
+}, [apiUrl]);
+
 
   // Get Expo Push Token on mount and store it securely
   useEffect(() => {
@@ -114,7 +131,7 @@ export default function ProfileScreen() {
             headers: {
               Authorization: `Bearer ${token}`,
               Accept: "application/json",
-              "Expo-Token": expoToken,
+              "Device-Token": expoToken,
             },
           }
         );
@@ -153,7 +170,7 @@ export default function ProfileScreen() {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
             Accept: "application/json",
-            "Expo-Token": expoToken,
+            "Device-Token": expoToken,
           },
           body: JSON.stringify({ [key]: newValue }),
         }
@@ -206,7 +223,7 @@ export default function ProfileScreen() {
                 "Content-Type": "application/json",
                 Accept: "application/json",
               },
-              body: JSON.stringify({ expo_token: currentExpoToken }),
+              body: JSON.stringify({ token: currentExpoToken }),
             });
 
             const data = await response.json();

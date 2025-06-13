@@ -100,7 +100,7 @@ export default function LoginScreen() {
         body: JSON.stringify({
           email,
           password,
-          expo_token: expoToken,
+          token: expoToken,
           device_type: Platform.OS,
         }),
       });
